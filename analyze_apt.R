@@ -1,6 +1,7 @@
 library('httr')
 library('jsonlite')
 library('XML')
+library('ggplot2')
 
 url1 <- "http://rt.molit.go.kr/rtApt.do?cmd=srhLocalView"
 url2 <- "http://rt.molit.go.kr/rtApt.do?cmd=searchGugun&aptGubun=1"
@@ -44,10 +45,9 @@ cat('\n')
 danjiCode <- l$moctJsonList$DANJI_CODE[i]
 
 ua <- "Mozilla/5.0 (MSIE 9.0; Windows NT 6.1; Trident/5.0)"
-areacode = read.csv("areacode.csv")
 data <- list()
 for(year in 2006:2015) {
-  print(year)
+  cat(paste(year, "년 데이터 받아오는 중..", sep=" "))
   for(period in 1:4) {
     body <- list(dongCode=dongCode,danjiCode=danjiCode,srhYear=year,srhPeriod=period,gubunRadio2=1)
     response <- content(POST(url5, body=body, encode = "form", user_agent(ua)))
@@ -63,13 +63,47 @@ for(year in 2006:2015) {
 data$SUM_AMT <- as.numeric(gsub(",","", data$SUM_AMT))
 data$MONTH <- as.numeric(data$MONTH)
 data$FLOOR <- as.numeric(data$FLOOR)
+data$AREA <- as.numeric(data$AREA)
+data$TIME <- as.Date(paste(data$YEAR, data$MONTH, "01"), "%Y %m %d")
+data <- data[order(data$TIME),]
 write.csv(data, file = paste(name, "csv", sep="."))
 plot.new()
-x <- 1:length(data$YEAR)
-y <- data$SUM_AMT
-colors <- colorRampPalette(c("red", "orange", "yellow", "green", "blue"))(6)
-col <- colors[findInterval(data$FLOOR, c(3, 5, 10, 15, 20))+1]
-plot(x, y, xaxt = "n", main=paste(name,"거래가"), xlab="날짜", ylab="거래가(만원)", pch=20, col = col)
-axis(1, at=x, labels=paste(data$YEAR, data$MONTH, sep='-'))
-lo<-loess(y~x)
-lines(predict(lo), col='blue', lwd=2)
+
+colours <- c("red","yellow","green","lightblue","darkblue")
+
+g <- ggplot(data, aes(TIME, SUM_AMT, color=FLOOR))
+g <- g + geom_point() 
+g <- g + xlab("거래날짜") 
+g <- g + ylab("거래가(만원)") 
+g <- g + ggtitle(paste(name,"거래가")) 
+g <- g + geom_smooth(method = "loess", size = 1) 
+g <- g + theme_bw()
+g <- g + scale_colour_gradientn(colours = colours)
+print(g)
+
+cat("[Enter] to see next plot")
+line <- readline()
+data <- data[order(data$FLOOR),]
+
+g <- ggplot(data, aes(FLOOR, SUM_AMT, color=AREA))
+g <- g + geom_point() 
+g <- g + xlab("층수") 
+g <- g + ylab("거래가(만원)") 
+g <- g + ggtitle(paste(name,"층별 거래가")) 
+g <- g + geom_smooth(method = "loess", size = 1) 
+g <- g + theme_bw()
+g <- g + scale_colour_gradientn(colours = colours)
+print(g)
+
+cat("[Enter] to see next plot")
+line <- readline()
+data <- data[order(data$AREA),]
+
+g <- ggplot(data, aes(factor(AREA), SUM_AMT))
+g <- g + geom_boxplot()
+g <- g + geom_point() 
+g <- g + xlab("제곱미터") 
+g <- g + ylab("거래가(만원)") 
+g <- g + ggtitle(paste(name,"평수별 거래가")) 
+g <- g + theme_bw()
+print(g)
